@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CampusCart — Student Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+</head>
+<body>
+
+<!-- ═══════════════════ NAVBAR ═══════════════════ -->
+{% if page != 'login' and page != 'register' %}
+<nav class="navbar">
+  <a href="{{ url_for('index') }}" class="nav-brand">
+    <span class="brand-icon">🛍</span>
+    Campus<span class="brand-accent">Cart</span>
+  </a>
+  <div class="nav-links">
+    <a href="{{ url_for('index') }}" class="nav-link {% if page == 'home' %}active{% endif %}">Browse</a>
+    <a href="{{ url_for('post_item') }}" class="nav-link {% if page == 'post' %}active{% endif %}">+ Sell</a>
+    <a href="{{ url_for('cart') }}" class="nav-link cart-link {% if page == 'cart' %}active{% endif %}">
+      🛒 Cart
+      {% if cart_count and cart_count > 0 %}
+        <span class="cart-badge">{{ cart_count }}</span>
+      {% endif %}
+    </a>
+    <div class="nav-user">
+      <span class="user-chip">👤 {{ user }}</span>
+      <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+<!-- ═══════════════════ FLASH MESSAGES ═══════════════════ -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-container">
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">
+          {% if category == 'success' %}✅{% elif category == 'error' %}❌{% else %}ℹ️{% endif %}
+          {{ message }}
+          <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- ═══════════════════ PAGE: LOGIN ═══════════════════ -->
+{% if page == 'login' %}
+<div class="auth-screen">
+  <div class="auth-deco"></div>
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">🛍 CampusCart</div>
+      <p class="auth-tagline">The campus marketplace for students, by students.</p>
+    </div>
+    <form action="{{ url_for('login') }}" method="POST" class="auth-form">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" placeholder="e.g. john_doe" required autocomplete="off"/>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" required/>
+      </div>
+      <button type="submit" class="btn-primary full-width">Login →</button>
+    </form>
+    <div class="auth-footer">
+      New here? <a href="{{ url_for('register') }}">Create an account</a>
+    </div>
+    <div class="demo-hint">
+      <strong>Demo accounts:</strong> alice / pass123 &nbsp;|&nbsp; bob / pass456
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE: REGISTER ═══════════════════ -->
+{% elif page == 'register' %}
+<div class="auth-screen">
+  <div class="auth-deco"></div>
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">🛍 CampusCart</div>
+      <p class="auth-tagline">Join your campus marketplace today.</p>
+    </div>
+    <form action="{{ url_for('register') }}" method="POST" class="auth-form">
+      <div class="form-group">
+        <label for="username">Choose a Username</label>
+        <input type="text" id="username" name="username" placeholder="e.g. techie_ravi" required autocomplete="off"/>
+      </div>
+      <div class="form-group">
+        <label for="password">Create a Password</label>
+        <input type="password" id="password" name="password" placeholder="Min. 4 characters" required/>
+      </div>
+      <button type="submit" class="btn-primary full-width">Create Account →</button>
+    </form>
+    <div class="auth-footer">
+      Already have an account? <a href="{{ url_for('login') }}">Login</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE: HOME ═══════════════════ -->
+{% elif page == 'home' %}
+<main class="main-content">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-text">
+      <h1>Find what you need.<br>Sell what you don't.</h1>
+      <p>The student marketplace for your campus. Buy, sell, and chat directly.</p>
+    </div>
+    <a href="{{ url_for('post_item') }}" class="btn-primary">Post an Item ✨</a>
+  </section>
+
+  <!-- Search + Filter -->
+  <section class="filters-section">
+    <form method="GET" action="{{ url_for('index') }}" class="search-bar-form">
+      <input type="text" name="q" value="{{ search_query }}" placeholder="Search items..." class="search-input"/>
+      <button type="submit" class="btn-search">Search</button>
+    </form>
+    <div class="category-pills">
+      {% for cat in categories %}
+        <a href="{{ url_for('index', category=cat, q=search_query) }}"
+           class="pill {% if active_category == cat %}pill-active{% endif %}">{{ cat }}</a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Items Grid -->
+  <section class="items-section">
+    <div class="section-header">
+      <h2>{% if active_category != 'All' %}{{ active_category }}{% else %}All Listings{% endif %}</h2>
+      <span class="item-count">{{ items|length }} item{{ 's' if items|length != 1 }}</span>
+    </div>
+
+    {% if items %}
+    <div class="items-grid">
+      {% for item in items %}
+      <a href="{{ url_for('item_detail', item_id=item.id) }}" class="item-card {% if item.sold %}item-sold{% endif %}">
+        <div class="item-img-wrap">
+          <img src="{{ url_for('static', filename=item.image) }}"
+               onerror="this.src='https://placehold.co/400x280/f0f0f0/999?text=📦'"
+               alt="{{ item.name }}" class="item-img"/>
+          {% if item.sold %}
+            <div class="sold-overlay">SOLD</div>
+          {% endif %}
+          <span class="category-tag">{{ item.category }}</span>
+        </div>
+        <div class="item-info">
+          <h3 class="item-name">{{ item.name }}</h3>
+          <p class="item-desc">{{ item.description[:70] }}{% if item.description|length > 70 %}…{% endif %}</p>
+          <div class="item-meta">
+            <span class="item-price">₹{{ "%.0f"|format(item.price) }}</span>
+            <span class="item-seller">by {{ item.seller }}</span>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">📭</div>
+      <h3>No items found</h3>
+      <p>{% if search_query %}Try a different search term.{% else %}Be the first to list something!{% endif %}</p>
+      <a href="{{ url_for('post_item') }}" class="btn-primary">Post an Item</a>
+    </div>
+    {% endif %}
+  </section>
+</main>
+
+<!-- ═══════════════════ PAGE: POST ITEM ═══════════════════ -->
+{% elif page == 'post' %}
+<main class="main-content">
+  <div class="form-page">
+    <div class="form-page-header">
+      <h1>List an Item</h1>
+      <p>Fill in the details and reach thousands of students on campus.</p>
+    </div>
+    <form action="{{ url_for('post_item') }}" method="POST" enctype="multipart/form-data" class="item-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="name">Item Name *</label>
+          <input type="text" id="name" name="name" placeholder="e.g. Physics Textbook" required/>
+        </div>
+        <div class="form-group">
+          <label for="price">Price (₹) *</label>
+          <input type="number" id="price" name="price" placeholder="e.g. 250" min="0" step="0.01" required/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="category">Category *</label>
+        <select id="category" name="category" required>
+          <option value="" disabled selected>Select a category</option>
+          <option value="Books">Books</option>
+          <option value="Electronics">Electronics</option>
+          <option value="Fashion">Fashion</option>
+          <option value="Sports">Sports</option>
+          <option value="Stationery">Stationery</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="description">Description *</label>
+        <textarea id="description" name="description" rows="4" placeholder="Describe your item — condition, age, reason for selling…" required></textarea>
+      </div>
+      <div class="form-group">
+        <label for="image">Item Photo</label>
+        <div class="file-drop" id="fileDrop">
+<input type="file" id="image" name="image"
+       accept=".png,.jpg,.jpeg,.gif,.webp,.pdf"
+       class="file-input"
+       onchange="previewImage(event)">          <div class="file-drop-inner" id="fileDropInner">
+            <span class="file-icon">📷</span>
+            <span>Click to upload photo</span>
+            <span class="file-hint">PNG, JPG, WEBP up to 5MB</span>
+          </div>
+          <img id="imagePreview" class="image-preview hidden" alt="Preview"/>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary full-width">Post Item 🚀</button>
+    </form>
+  </div>
+</main>
+
+<!-- ═══════════════════ PAGE: ITEM DETAIL ═══════════════════ -->
+{% elif page == 'detail' %}
+<main class="main-content">
+  <div class="detail-layout">
+
+    <!-- Left: Image + Actions -->
+    <div class="detail-left">
+      <div class="detail-img-wrap">
+{% if item.image.endswith('.pdf') %}
+    <div style="padding:20px; text-align:center;">
+        📄 PDF File<br>
+        <a href="{{ url_for('static', filename=item.image) }}" target="_blank">
+            Open PDF
+        </a>
+    </div>
+{% else %}
+    <img src="{{ url_for('static', filename=item.image) }}"
+         onerror="this.src='https://placehold.co/400x280/f0f0f0/999?text=📦'"
+         alt="{{ item.name }}" class="item-img"/>
+{% endif %}             onerror="this.src='https://placehold.co/600x420/f0f0f0/999?text=📦'"
+             alt="{{ item.name }}" class="detail-img"/>
+        {% if item.sold %}
+          <div class="sold-overlay-big">SOLD</div>
+        {% endif %}
+      </div>
+
+      <!-- Seller controls -->
+      {% if user == item.seller %}
+      <div class="seller-controls">
+        <p class="seller-label">⚙️ Your listing</p>
+        {% if not item.sold %}
+        <form action="{{ url_for('mark_sold', item_id=item.id) }}" method="POST">
+          <button type="submit" class="btn-sold">Mark as Sold ✓</button>
+        </form>
+        {% endif %}
+        <form action="{{ url_for('delete_item', item_id=item.id) }}" method="POST"
+              onsubmit="return confirm('Delete this item?')">
+          <button type="submit" class="btn-delete">Delete Item 🗑</button>
+        </form>
+      </div>
+      {% endif %}
+
+      <!-- Add to cart -->
+      {% if user != item.seller %}
+        {% if item.sold %}
+          <button class="btn-cart-disabled" disabled>Item Sold</button>
+        {% elif in_cart %}
+          <a href="{{ url_for('cart') }}" class="btn-cart-alt">View in Cart →</a>
+        {% else %}
+          <form action="{{ url_for('add_to_cart', item_id=item.id) }}" method="POST">
+            <button type="submit" class="btn-cart">Add to Cart 🛒</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <!-- Right: Info + Chat -->
+    <div class="detail-right">
+      <div class="detail-info">
+        <span class="detail-category-tag">{{ item.category }}</span>
+        <h1 class="detail-title">{{ item.name }}</h1>
+        <div class="detail-price">₹{{ "%.0f"|format(item.price) }}</div>
+        <div class="detail-seller">Listed by <strong>{{ item.seller }}</strong></div>
+        <p class="detail-desc">{{ item.description }}</p>
+        {% if item.sold %}
+          <div class="status-badge sold">● SOLD</div>
+        {% else %}
+          <div class="status-badge available">● Available</div>
+        {% endif %}
+      </div>
+
+      <!-- Chat Section -->
+      <div class="chat-section" id="chat">
+        <h3 class="chat-title">💬 Chat about this item</h3>
+        <div class="chat-box">
+          {% if messages %}
+            {% for msg in messages %}
+              <div class="chat-msg {% if msg.sender == user %}chat-msg-me{% else %}chat-msg-other{% endif %}">
+                <div class="chat-bubble">
+                  <span class="chat-text">{{ msg.message }}</span>
+                </div>
+                <div class="chat-meta">{{ msg.sender }} · {{ msg.time }}</div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="chat-empty">No messages yet. Start the conversation! 👋</div>
+          {% endif %}
+        </div>
+        <form action="{{ url_for('send_message', item_id=item.id) }}" method="POST" class="chat-form">
+          <input type="text" name="message" placeholder="Type a message…" class="chat-input" required autocomplete="off"/>
+          <button type="submit" class="chat-send">Send →</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ═══════════════════ PAGE: CART ═══════════════════ -->
+{% elif page == 'cart' %}
+<main class="main-content">
+  <div class="cart-page">
+    <h1 class="cart-title">Your Cart 🛒</h1>
+    {% if cart_items %}
+    <div class="cart-layout">
+      <div class="cart-items">
+        {% for item in cart_items %}
+        <div class="cart-item-row {% if item.sold %}cart-item-sold{% endif %}">
+          <img src="{{ url_for('static', filename=item.image) }}"
+               onerror="this.src='https://placehold.co/80x80/f0f0f0/999?text=📦'"
+               alt="{{ item.name }}" class="cart-thumb"/>
+          <div class="cart-item-info">
+            <a href="{{ url_for('item_detail', item_id=item.id) }}" class="cart-item-name">{{ item.name }}</a>
+            <span class="cart-item-cat">{{ item.category }}</span>
+            {% if item.sold %}<span class="sold-tag">SOLD</span>{% endif %}
+          </div>
+          <div class="cart-item-price">₹{{ "%.0f"|format(item.price) }}</div>
+          <form action="{{ url_for('remove_from_cart', item_id=item.id) }}" method="POST">
+            <button type="submit" class="cart-remove">✕</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="cart-summary">
+        <h3>Order Summary</h3>
+        <div class="summary-row">
+          <span>Subtotal (available items)</span>
+          <span>₹{{ "%.0f"|format(total) }}</span>
+        </div>
+        <div class="summary-row summary-total">
+          <span>Total</span>
+          <span>₹{{ "%.0f"|format(total) }}</span>
+        </div>
+        <p class="cart-note">📍 Items are reserved by contacting the seller directly via chat.</p>
+        <a href="{{ url_for('index') }}" class="btn-primary full-width">Continue Browsing</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">🛒</div>
+      <h3>Your cart is empty</h3>
+      <p>Start adding items you'd like to buy!</p>
+      <a href="{{ url_for('index') }}" class="btn-primary">Browse Items</a>
+    </div>
+    {% endif %}
+  </div>
+</main>
+{% endif %}
+
+<!-- Footer -->
+{% if page != 'login' and page != 'register' %}
+<footer class="footer">
+  <p>🛍 CampusCart · Made for college students · <a href="{{ url_for('post_item') }}">List something new</a></p>
+</footer>
+{% endif %}
+
+<script>
+// Image preview on upload
+function previewImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const preview = document.getElementById('imagePreview');
+    const inner = document.getElementById('fileDropInner');
+    preview.src = e.target.result;
+    preview.classList.remove('hidden');
+    inner.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Auto-scroll chat to bottom
+const chatBox = document.querySelector('.chat-box');
+if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+
+// Auto-dismiss flash messages after 4 seconds
+setTimeout(() => {
+  document.querySelectorAll('.flash').forEach(el => el.remove());
+}, 4000);
+</script>
+</body>
+</html>
