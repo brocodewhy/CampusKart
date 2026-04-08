@@ -74,7 +74,12 @@ def login():
             flash("Invalid username or password.", "error")
             return redirect(url_for("login"))
 
-    return render_template("index.html", page="login")
+    return render_template(
+    "index.html",
+    page="login",
+    user="Guest",
+    cart_count=0
+)
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -100,7 +105,12 @@ def register():
         flash(f"Account created! Welcome, {username}! 🎉", "success")
         return redirect(url_for("index"))
 
-    return render_template("index.html", page="register")
+    return render_template(
+    "index.html",
+    page="register",
+    user="Guest",
+    cart_count=0
+)
 
 
 @app.route("/logout")
