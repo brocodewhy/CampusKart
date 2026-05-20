@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="CampusCart — The student marketplace for your campus. Buy, sell, and chat directly with fellow students."/>
+  <title>CampusCart — Student Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%237c3aed'/><stop offset='100%25' stop-color='%233b82f6'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='url(%23g)'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='white'>🛒</text></svg>">
+  <!-- Theme script to prevent flash -->
+  <script>
+    (function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      if (theme === 'light') {
+        document.documentElement.classList.add('light-theme');
+      }
+    })();
+  </script>
+</head>
+<body>
+
+<!-- ═══════════════════ NAVBAR ═══════════════════ -->
+{% if page != 'login' and page != 'register' %}
+<nav class="navbar">
+  <a href="{{ url_for('index') }}" class="nav-brand">
+    <span class="brand-icon">🛍</span>
+    Campus<span class="brand-accent">Cart</span>
+  </a>
+  <div class="nav-links">
+    <a href="{{ url_for('index') }}" class="nav-link {% if page == 'home' %}active{% endif %}">Browse</a>
+    <a href="{{ url_for('post_item') }}" class="nav-link {% if page == 'post' %}active{% endif %}">+ Sell</a>
+    <a href="{{ url_for('dashboard') }}" class="nav-link {% if page == 'dashboard' %}active{% endif %}">Dashboard</a>
+    <a href="{{ url_for('cart') }}" class="nav-link cart-link {% if page == 'cart' %}active{% endif %}">
+      🛒 Cart
+      {% if cart_count and cart_count > 0 %}
+        <span class="cart-badge">{{ cart_count }}</span>
+      {% endif %}
+    </a>
+    <button class="nav-notify" id="notifBell" title="Notifications" onclick="window.location.href='{{ url_for('dashboard') }}'">
+      🔔
+      <span class="notify-dot" id="notifyDot"></span>
+    </button>
+    <button class="nav-notify" id="themeToggle" title="Toggle Theme" onclick="toggleTheme()" style="margin-right: 8px;">
+      🌓
+    </button>
+    <div class="nav-user">
+      <span class="user-chip">👤 {{ user }}</span>
+      <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+<!-- Notification Toast Container -->
+<div class="notif-toast-container" id="toastContainer"></div>
+
+<!-- ═══════════════════ FLASH MESSAGES ═══════════════════ -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-container">
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">
+          {% if category == 'success' %}✅{% elif category == 'error' %}❌{% else %}ℹ️{% endif %}
+          {{ message }}
+          <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- ═══════════════════ PAGE: LOGIN ═══════════════════ -->
+{% if page == 'login' %}
+<div class="auth-screen">
+  <button class="theme-toggle-floating" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
+  <div class="auth-deco"></div>
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">🛍 CampusCart</div>
+      <p class="auth-tagline">The campus marketplace for students, by students.</p>
+    </div>
+    <form action="{{ url_for('login') }}" method="POST" class="auth-form">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" placeholder="e.g. john_doe" required autocomplete="off"/>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" required/>
+      </div>
+      <button type="submit" class="btn-primary full-width">Login →</button>
+    </form>
+    <div class="auth-footer">
+      New here? <a href="{{ url_for('register') }}">Create an account</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE: REGISTER ═══════════════════ -->
+{% elif page == 'register' %}
+<div class="auth-screen">
+  <button class="theme-toggle-floating" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
+  <div class="auth-deco"></div>
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">🛍 CampusCart</div>
+      <p class="auth-tagline">Join your campus marketplace today.</p>
+    </div>
+    <form action="{{ url_for('register') }}" method="POST" class="auth-form">
+      <div class="form-group">
+        <label for="username">Choose a Username</label>
+        <input type="text" id="username" name="username" placeholder="e.g. techie_ravi" required autocomplete="off"/>
+      </div>
+      <div class="form-group">
+        <label for="password">Create a Password</label>
+        <input type="password" id="password" name="password" placeholder="Min. 4 characters" required/>
+      </div>
+      <button type="submit" class="btn-primary full-width">Create Account →</button>
+    </form>
+    <div class="auth-footer">
+      Already have an account? <a href="{{ url_for('login') }}">Login</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE: HOME ═══════════════════ -->
+{% elif page == 'home' %}
+<main class="main-content">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-text">
+      <h1>Find what you need.<br>Sell what you don't.</h1>
+      <p>The student marketplace for your campus. Buy, sell, and chat directly.</p>
+    </div>
+    <a href="{{ url_for('post_item') }}" class="btn-primary">Post an Item ✨</a>
+  </section>
+
+  <!-- Search + Filter -->
+  <section class="filters-section">
+    <form method="GET" action="{{ url_for('index') }}" class="search-bar-form">
+      <input type="text" name="q" value="{{ search_query }}" placeholder="Search items..." class="search-input"/>
+      <button type="submit" class="btn-search">Search</button>
+    </form>
+    <div class="category-pills">
+      {% for cat in categories %}
+        <a href="{{ url_for('index', category=cat, q=search_query) }}"
+           class="pill {% if active_category == cat %}pill-active{% endif %}">{{ cat }}</a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Items Grid -->
+  <section class="items-section">
+    <div class="section-header">
+      <h2>{% if active_category != 'All' %}{{ active_category }}{% else %}All Listings{% endif %}</h2>
+      <span class="item-count">{{ items|length }} item{{ 's' if items|length != 1 }}</span>
+    </div>
+
+    {% if items %}
+    <div class="items-grid">
+      {% for item in items %}
+      <a href="{{ url_for('item_detail', item_id=item.id) }}" class="item-card {% if item.sold %}item-sold{% endif %}">
+        <div class="item-img-wrap">
+          {% if item.image.endswith('.pdf') or (item.image.startswith('uploads/') and item.image.endswith('.pdf')) %}
+            <!-- PDF Preview Card -->
+            <div class="pdf-preview-card">
+              <span class="pdf-icon">📄</span>
+              <span class="pdf-label">PDF Document</span>
+            </div>
+          {% else %}
+            <img src="{{ url_for('static', filename=item.image) }}"
+                 onerror="this.src='https://placehold.co/400x280/1a1828/6b6585?text=📦'"
+                 alt="{{ item.name }}" class="item-img"/>
+          {% endif %}
+          {% if item.sold %}
+            <div class="sold-overlay">SOLD</div>
+          {% endif %}
+          <span class="category-tag">{{ item.category }}</span>
+        </div>
+        <div class="item-info">
+          <h3 class="item-name">{{ item.name }}</h3>
+          <p class="item-desc">{{ item.description[:70] }}{% if item.description|length > 70 %}…{% endif %}</p>
+          <div class="item-meta">
+            <span class="item-price">₹{{ "%.0f"|format(item.price) }}</span>
+            <span class="item-seller">by {{ item.seller }}</span>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">📭</div>
+      <h3>No items found</h3>
+      <p>{% if search_query %}Try a different search term.{% else %}Be the first to list something!{% endif %}</p>
+      <a href="{{ url_for('post_item') }}" class="btn-primary">Post an Item</a>
+    </div>
+    {% endif %}
+  </section>
+</main>
+
+<!-- ═══════════════════ PAGE: POST ITEM ═══════════════════ -->
+{% elif page == 'post' %}
+<main class="main-content">
+  <div class="form-page">
+    <div class="form-page-header">
+      <h1>List an Item</h1>
+      <p>Fill in the details and reach thousands of students on campus.</p>
+    </div>
+    <form action="{{ url_for('post_item') }}" method="POST" enctype="multipart/form-data" class="item-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="name">Item Name *</label>
+          <input type="text" id="name" name="name" placeholder="e.g. Physics Textbook" required/>
+        </div>
+        <div class="form-group">
+          <label for="price">Price (₹) *</label>
+          <input type="number" id="price" name="price" placeholder="e.g. 250" min="0" step="0.01" required/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="category">Category *</label>
+        <select id="category" name="category" required>
+          <option value="" disabled selected>Select a category</option>
+          <option value="Books">Books</option>
+          <option value="Electronics">Electronics</option>
+          <option value="Fashion">Fashion</option>
+          <option value="Sports">Sports</option>
+          <option value="Stationery">Stationery</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="description">Description *</label>
+        <textarea id="description" name="description" rows="4" placeholder="Describe your item — condition, age, reason for selling…" required></textarea>
+      </div>
+      <div class="form-group">
+        <label for="image">Item Photo or PDF</label>
+        <div class="file-drop" id="fileDrop">
+          <input type="file" id="image" name="image" accept="image/*,.pdf" class="file-input" onchange="previewFile(event)"/>
+          <div class="file-drop-inner" id="fileDropInner">
+            <span class="file-icon">📷</span>
+            <span>Click to upload photo or PDF</span>
+            <span class="file-hint">PNG, JPG, WEBP, PDF up to 5MB</span>
+          </div>
+          <img id="imagePreview" class="image-preview hidden" alt="Preview"/>
+          <div id="pdfPreview" class="pdf-file-preview hidden">
+            <span class="pdf-icon">📄</span>
+            <div class="pdf-file-info">
+              <span class="pdf-file-name" id="pdfFileName"></span>
+              <span class="pdf-file-size" id="pdfFileSize"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary full-width">Post Item 🚀</button>
+    </form>
+  </div>
+</main>
+
+<!-- ═══════════════════ PAGE: ITEM DETAIL ═══════════════════ -->
+{% elif page == 'detail' %}
+<main class="main-content">
+  <div class="detail-layout">
+
+    <!-- Left: Image + Actions -->
+    <div class="detail-left">
+      {% if item.image.endswith('.pdf') %}
+        <!-- PDF Detail Card -->
+        <div class="pdf-detail-card">
+          <span class="pdf-detail-icon">📄</span>
+          <span class="pdf-detail-text">PDF Document Attached</span>
+          <a href="{{ url_for('static', filename=item.image) }}" target="_blank" class="btn-open-pdf">
+            📂 Open PDF
+          </a>
+        </div>
+      {% else %}
+        <div class="detail-img-wrap">
+          <img src="{{ url_for('static', filename=item.image) }}"
+               onerror="this.src='https://placehold.co/600x420/1a1828/6b6585?text=📦'"
+               alt="{{ item.name }}" class="detail-img"/>
+          {% if item.sold %}
+            <div class="sold-overlay-big">SOLD</div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <!-- Seller controls -->
+      {% if user == item.seller %}
+      <div class="seller-controls">
+        <p class="seller-label">⚙️ Your listing</p>
+        {% if not item.sold %}
+        <form action="{{ url_for('mark_sold', item_id=item.id) }}" method="POST">
+          <button type="submit" class="btn-sold">Mark as Sold ✓</button>
+        </form>
+        {% else %}
+        <form action="{{ url_for('mark_unsold', item_id=item.id) }}" method="POST">
+          <button type="submit" class="btn-sold" style="background: var(--primary-light); color: var(--primary-muted); border-color: rgba(124, 58, 237, 0.3);">Mark as Available ↺</button>
+        </form>
+        {% endif %}
+        <form action="{{ url_for('delete_item', item_id=item.id) }}" method="POST"
+              onsubmit="return confirm('Delete this item?')">
+          <button type="submit" class="btn-delete">Delete Item 🗑</button>
+        </form>
+      </div>
+      {% endif %}
+
+      <!-- Add to cart -->
+      {% if user != item.seller %}
+        {% if item.sold %}
+          <button class="btn-cart-disabled" disabled>Item Sold</button>
+        {% elif in_cart %}
+          <a href="{{ url_for('cart') }}" class="btn-cart-alt">View in Cart →</a>
+        {% else %}
+          <form action="{{ url_for('add_to_cart', item_id=item.id) }}" method="POST">
+            <button type="submit" class="btn-cart">Add to Cart 🛒</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <!-- Right: Info + Chat -->
+    <div class="detail-right">
+      <div class="detail-info">
+        <span class="detail-category-tag">{{ item.category }}</span>
+        <h1 class="detail-title">{{ item.name }}</h1>
+        <div class="detail-price">₹{{ "%.0f"|format(item.price) }}</div>
+        <div class="detail-seller">Listed by <strong>{{ item.seller }}</strong></div>
+        <p class="detail-desc">{{ item.description }}</p>
+        {% if item.sold %}
+          <div class="status-badge sold">● SOLD</div>
+        {% else %}
+          <div class="status-badge available">● Available</div>
+        {% endif %}
+      </div>
+
+      <!-- Chat Section (Live Polling) -->
+      <div class="chat-section" id="chat">
+        <h3 class="chat-title">
+          💬 Chat about this item
+          <span class="chat-status">Live</span>
+        </h3>
+        <div class="chat-box" id="chatBox">
+          {% if messages %}
+            {% for msg in messages %}
+              <div class="chat-msg {% if msg.sender == user %}chat-msg-me{% else %}chat-msg-other{% endif %}">
+                <div class="chat-bubble">
+                  <span class="chat-text">{{ msg.message }}</span>
+                </div>
+                <div class="chat-meta">{{ msg.sender }} · {{ msg.time }}</div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="chat-empty" id="chatEmpty">No messages yet. Start the conversation! 👋</div>
+          {% endif %}
+        </div>
+        <!-- Chat form now uses JS fetch instead of page reload -->
+        <form class="chat-form" id="chatForm" onsubmit="sendChatMessage(event)">
+          <input type="text" id="chatInput" placeholder="Type a message…" class="chat-input" required autocomplete="off"/>
+          <button type="submit" class="chat-send">Send →</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ═══════════════════ PAGE: CART ═══════════════════ -->
+{% elif page == 'cart' %}
+<main class="main-content">
+  <div class="cart-page">
+    <h1 class="cart-title">Your Cart 🛒</h1>
+    {% if cart_items %}
+    <div class="cart-layout">
+      <div class="cart-items">
+        {% for item in cart_items %}
+        <div class="cart-item-row {% if item.sold %}cart-item-sold{% endif %}">
+          {% if item.image.endswith('.pdf') %}
+            <div class="cart-thumb" style="display:flex;align-items:center;justify-content:center;background:var(--bg-secondary);font-size:1.5rem;">📄</div>
+          {% else %}
+            <img src="{{ url_for('static', filename=item.image) }}"
+                 onerror="this.src='https://placehold.co/80x80/1a1828/6b6585?text=📦'"
+                 alt="{{ item.name }}" class="cart-thumb"/>
+          {% endif %}
+          <div class="cart-item-info">
+            <a href="{{ url_for('item_detail', item_id=item.id) }}" class="cart-item-name">{{ item.name }}</a>
+            <span class="cart-item-cat">{{ item.category }}</span>
+            {% if item.sold %}<span class="sold-tag">SOLD</span>{% endif %}
+          </div>
+          <div class="cart-item-price">₹{{ "%.0f"|format(item.price) }}</div>
+          <form action="{{ url_for('remove_from_cart', item_id=item.id) }}" method="POST">
+            <button type="submit" class="cart-remove">✕</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="cart-summary">
+        <h3>Order Summary</h3>
+        <div class="summary-row">
+          <span>Subtotal (available items)</span>
+          <span>₹{{ "%.0f"|format(total) }}</span>
+        </div>
+        <div class="summary-row summary-total">
+          <span>Total</span>
+          <span>₹{{ "%.0f"|format(total) }}</span>
+        </div>
+        <p class="cart-note">📍 Items are reserved by contacting the seller directly via chat.</p>
+        <a href="{{ url_for('index') }}" class="btn-primary full-width">Continue Browsing</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">🛒</div>
+      <h3>Your cart is empty</h3>
+      <p>Start adding items you'd like to buy!</p>
+      <a href="{{ url_for('index') }}" class="btn-primary">Browse Items</a>
+    </div>
+    {% endif %}
+  </div>
+</main>
+
+<!-- ═══════════════════ PAGE: DASHBOARD ═══════════════════ -->
+{% elif page == 'dashboard' %}
+<main class="main-content">
+  <div class="dashboard-page">
+    <div class="dash-header">
+      <h1>Dashboard</h1>
+      <p>Welcome back, {{ user }}! Here's your overview.</p>
+    </div>
+
+    <div class="dash-grid">
+      <!-- Sidebar -->
+      <div class="dash-sidebar">
+        <div class="dash-profile-card">
+          <div class="dash-avatar">{{ user[0] }}</div>
+          <div class="dash-username">{{ user }}</div>
+          <span class="dash-role">🎓 Student Seller</span>
+        </div>
+
+        <div class="dash-quick-actions">
+          <h3>Quick Actions</h3>
+          <a href="{{ url_for('post_item') }}" class="dash-action-btn">📝 Post New Item</a>
+          <a href="{{ url_for('index') }}" class="dash-action-btn">🔍 Browse Listings</a>
+          <a href="{{ url_for('cart') }}" class="dash-action-btn">🛒 View Cart</a>
+          <a href="{{ url_for('logout') }}" class="dash-action-btn">🚪 Logout</a>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="dash-main">
+        <!-- Stats -->
+        <div class="dash-stats">
+          <div class="stat-card">
+            <span class="stat-label">Total Listed</span>
+            <span class="stat-value">{{ total_items }}</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Items Sold</span>
+            <span class="stat-value">{{ sold_items }}</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Active</span>
+            <span class="stat-value">{{ active_items }}</span>
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="dash-section">
+          <div class="dash-section-title">🔔 Notifications</div>
+          {% if notifications %}
+            {% for notif in notifications %}
+            <div class="notif-item">
+              <div class="notif-icon">💬</div>
+              <div class="notif-content">
+                <div class="notif-text"><strong>{{ notif.sender }}</strong> messaged about "{{ notif.item_name }}"</div>
+                <div class="notif-time">{{ notif.time }}</div>
+              </div>
+              <a href="{{ url_for('item_detail', item_id=notif.item_id) }}#chat" class="notif-action">View →</a>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="dash-empty">No new notifications 🎉</div>
+          {% endif %}
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="dash-section">
+          <div class="dash-section-title">📋 Recent Activity</div>
+          {% if activities %}
+          <ul class="activity-list">
+            {% for act in activities %}
+            <li class="activity-item">
+              <span class="activity-dot {{ act.type }}"></span>
+              <div>
+                <div class="activity-text">{{ act.message }}</div>
+                <div class="activity-time">{{ act.time }}</div>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+            <div class="dash-empty">No activity yet. Start by listing an item!</div>
+          {% endif %}
+        </div>
+
+        <!-- Your Items -->
+        {% if user_items %}
+        <div class="dash-section">
+          <div class="dash-section-title">📦 Your Items</div>
+          <div class="dash-items-grid">
+            {% for item in user_items %}
+            <a href="{{ url_for('item_detail', item_id=item.id) }}" class="dash-item-mini">
+              {% if item.image.endswith('.pdf') %}
+                <div class="dash-item-thumb" style="display:flex;align-items:center;justify-content:center;background:var(--bg-secondary);font-size:1.2rem;">📄</div>
+              {% else %}
+                <img src="{{ url_for('static', filename=item.image) }}"
+                     onerror="this.src='https://placehold.co/44x44/1a1828/6b6585?text=📦'"
+                     alt="{{ item.name }}" class="dash-item-thumb"/>
+              {% endif %}
+              <div class="dash-item-detail">
+                <div class="dash-item-name">{{ item.name }}</div>
+                <div class="dash-item-price">₹{{ "%.0f"|format(item.price) }} {% if item.sold %}· Sold{% endif %}</div>
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</main>
+
+{% endif %}
+
+<!-- Footer -->
+{% if page != 'login' and page != 'register' %}
+<footer class="footer">
+  <p>🛍 CampusCart · Made for college students · <a href="{{ url_for('post_item') }}">List something new</a></p>
+</footer>
+{% endif %}
+
+<script>
+// ═══════════════════════════════════════════
+//  IMAGE / PDF PREVIEW ON UPLOAD
+// ═══════════════════════════════════════════
+function previewFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const preview = document.getElementById('imagePreview');
+  const pdfPreview = document.getElementById('pdfPreview');
+  const inner = document.getElementById('fileDropInner');
+
+  // Reset both previews
+  if (preview) preview.classList.add('hidden');
+  if (pdfPreview) pdfPreview.classList.add('hidden');
+  if (inner) inner.style.display = '';
+
+  if (file.type === 'application/pdf') {
+    // PDF file preview
+    if (pdfPreview) {
+      document.getElementById('pdfFileName').textContent = file.name;
+      document.getElementById('pdfFileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+      pdfPreview.classList.remove('hidden');
+      if (inner) inner.style.display = 'none';
+    }
+  } else if (file.type.startsWith('image/')) {
+    // Image file preview
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      if (preview) {
+        preview.src = e.target.result;
+        preview.classList.remove('hidden');
+        if (inner) inner.style.display = 'none';
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  LIVE CHAT (Simple polling with fetch)
+// ═══════════════════════════════════════════
+{% if page == 'detail' %}
+const ITEM_ID = "{{ item.id }}";
+const CURRENT_USER = "{{ user }}";
+let lastMsgCount = {{ messages|length if messages else 0 }};
+
+// Fetch and render messages
+function refreshChat() {
+  fetch('/item/' + ITEM_ID + '/chat/messages')
+    .then(r => r.json())
+    .then(data => {
+      if (!data.messages) return;
+
+      // Only update if message count changed
+      if (data.messages.length !== lastMsgCount) {
+        const chatBox = document.getElementById('chatBox');
+        if (!chatBox) return;
+
+        // Check if new messages from others (for notification)
+        if (data.messages.length > lastMsgCount) {
+          const newMsgs = data.messages.slice(lastMsgCount);
+          newMsgs.forEach(msg => {
+            if (msg.sender !== CURRENT_USER) {
+              showToast('💬 New Message', msg.sender + ': ' + msg.message);
+              tryBrowserNotification('New message from ' + msg.sender, msg.message);
+            }
+          });
+        }
+
+        lastMsgCount = data.messages.length;
+
+        // Rebuild chat
+        let html = '';
+        if (data.messages.length === 0) {
+          html = '<div class="chat-empty">No messages yet. Start the conversation! 👋</div>';
+        } else {
+          data.messages.forEach(msg => {
+            const isMe = msg.sender === CURRENT_USER;
+            html += '<div class="chat-msg ' + (isMe ? 'chat-msg-me' : 'chat-msg-other') + '">';
+            html += '<div class="chat-bubble"><span class="chat-text">' + escapeHtml(msg.message) + '</span></div>';
+            html += '<div class="chat-meta">' + escapeHtml(msg.sender) + ' · ' + escapeHtml(msg.time) + '</div>';
+            html += '</div>';
+          });
+        }
+        chatBox.innerHTML = html;
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+    })
+    .catch(() => {}); // Silently fail
+}
+
+// Send message via AJAX (no page reload)
+function sendChatMessage(e) {
+  e.preventDefault();
+  const input = document.getElementById('chatInput');
+  const message = input.value.trim();
+  if (!message) return;
+
+  input.value = '';
+
+  fetch('/item/' + ITEM_ID + '/chat/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: message })
+  })
+  .then(r => r.json())
+  .then(() => {
+    refreshChat(); // Immediately refresh after sending
+  })
+  .catch(() => {});
+}
+
+// Poll every 2 seconds
+setInterval(refreshChat, 2000);
+{% endif %}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ═══════════════════════════════════════════
+//  BROWSER NOTIFICATIONS
+// ═══════════════════════════════════════════
+// Request permission
+if ('Notification' in window && Notification.permission === 'default') {
+  // Ask after a short delay so it's not annoying
+  setTimeout(() => {
+    Notification.requestPermission();
+  }, 3000);
+}
+
+function tryBrowserNotification(title, body) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, {
+      body: body,
+      icon: '🛍',
+      badge: '🛍',
+    });
+  }
+}
+
+// ═══════════════════════════════════════════
+//  NOTIFICATION POLLING (messages + new items)
+// ═══════════════════════════════════════════
+{% if page != 'login' and page != 'register' and page != 'detail' %}
+let lastNotifCount = 0;
+let lastKnownItemId = null;
+
+// Poll for unread message notifications
+function checkNotifications() {
+  fetch('/api/unread_notifications')
+    .then(r => r.json())
+    .then(data => {
+      const dot = document.getElementById('notifyDot');
+      if (data.notifications && data.notifications.length > 0) {
+        if (dot) dot.classList.add('active');
+        // Show toast + browser notif for new ones
+        if (data.notifications.length > lastNotifCount && lastNotifCount > 0) {
+          const latest = data.notifications[data.notifications.length - 1];
+          showToast('💬 New Message', latest.sender + ' messaged about "' + latest.item_name + '"');
+          tryBrowserNotification('Message from ' + latest.sender, latest.message);
+        }
+        lastNotifCount = data.notifications.length;
+      } else {
+        if (dot) dot.classList.remove('active');
+        lastNotifCount = 0;
+      }
+    })
+    .catch(() => {});
+}
+
+// Poll for new items posted
+function checkNewItems() {
+  fetch('/api/latest_item')
+    .then(r => r.json())
+    .then(data => {
+      if (data.id && lastKnownItemId && data.id !== lastKnownItemId && data.seller !== '{{ user }}') {
+        showToast('🆕 New Item', data.name + ' listed for ₹' + data.price);
+        tryBrowserNotification('New item on CampusCart!', data.name + ' — ₹' + data.price);
+      }
+      if (data.id) lastKnownItemId = data.id;
+    })
+    .catch(() => {});
+}
+
+// Initialize and start polling
+checkNotifications();
+checkNewItems();
+setInterval(checkNotifications, 5000);
+setInterval(checkNewItems, 10000);
+{% endif %}
+
+// ═══════════════════════════════════════════
+//  IN-APP TOAST NOTIFICATIONS
+// ═══════════════════════════════════════════
+function showToast(title, message) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = 'notif-toast';
+  toast.innerHTML =
+    '<span class="notif-toast-icon">🔔</span>' +
+    '<div class="notif-toast-body">' +
+    '<div class="notif-toast-title">' + escapeHtml(title) + '</div>' +
+    '<div class="notif-toast-msg">' + escapeHtml(message) + '</div>' +
+    '</div>';
+  container.appendChild(toast);
+
+  // Remove after animation completes
+  setTimeout(() => {
+    if (toast.parentElement) toast.remove();
+  }, 4200);
+}
+
+// ═══════════════════════════════════════════
+//  AUTO-SCROLL CHAT & AUTO-DISMISS FLASHES
+// ═══════════════════════════════════════════
+const chatBox = document.querySelector('.chat-box');
+if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+
+// Auto-dismiss flash messages after 4 seconds
+setTimeout(() => {
+  document.querySelectorAll('.flash').forEach(el => el.remove());
+}, 4000);
+
+// Toggle theme function
+function toggleTheme() {
+  const currentTheme = localStorage.getItem('theme') || 'dark';
+  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+  localStorage.setItem('theme', newTheme);
+  
+  if (newTheme === 'light') {
+    document.documentElement.classList.add('light-theme');
+  } else {
+    document.documentElement.classList.remove('light-theme');
+  }
+}
+</script>
+</body>
+</html>

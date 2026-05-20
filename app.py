@@ -3,27 +3,23 @@ CampusCart - Student Marketplace
 Flask Backend
 """
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import os
 import uuid
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "fallback_secret_key")
+app.secret_key = "campus_secret_key_2024"
 
 # ─────────────────────────────────────────
 #  In-Memory Storage
 # ─────────────────────────────────────────
 
 # Users: { username: password }
-users = {
-    "alice": "pass123",
-    "bob": "pass456",
-}
+users = {}
 
 # Items list: each item is a dict
 items = []
-
 
 # Cart: { username: [item_id, ...] }
 carts = {}
@@ -34,8 +30,17 @@ chats = {}
 # Allowed image extensions
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf"}
 UPLOAD_FOLDER = os.path.join("static", "uploads")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+UPLOAD_FOLDER = 'static/uploads'
 
+# Create upload folder safely
+if os.path.exists(UPLOAD_FOLDER):
+
+    if not os.path.isdir(UPLOAD_FOLDER):
+        os.remove(UPLOAD_FOLDER)
+        os.makedirs(UPLOAD_FOLDER)
+
+else:
+    os.makedirs(UPLOAD_FOLDER)
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -74,12 +79,7 @@ def login():
             flash("Invalid username or password.", "error")
             return redirect(url_for("login"))
 
-    return render_template(
-    "index.html",
-    page="login",
-    user="Guest",
-    cart_count=0
-)
+    return render_template("index.html", page="login")
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -105,12 +105,7 @@ def register():
         flash(f"Account created! Welcome, {username}! 🎉", "success")
         return redirect(url_for("index"))
 
-    return render_template(
-    "index.html",
-    page="register",
-    user="Guest",
-    cart_count=0
-)
+    return render_template("index.html", page="register")
 
 
 @app.route("/logout")
@@ -255,6 +250,19 @@ def mark_sold(item_id):
     return redirect(url_for("item_detail", item_id=item_id))
 
 
+@app.route("/item/<item_id>/mark_unsold", methods=["POST"])
+def mark_unsold(item_id):
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    item = get_item(item_id)
+    if item and item["seller"] == session["user"]:
+        item["sold"] = False
+        flash("Item marked as available.", "success")
+
+    return redirect(url_for("item_detail", item_id=item_id))
+
+
 @app.route("/item/<item_id>/delete", methods=["POST"])
 def delete_item(item_id):
     if "user" not in session:
@@ -362,9 +370,156 @@ def send_message(item_id):
     return redirect(url_for("item_detail", item_id=item_id) + "#chat")
 
 
+@app.route("/item/<item_id>/chat/send", methods=["POST"])
+def send_chat_ajax(item_id):
+    """AJAX endpoint for sending chat messages without page reload."""
+    if "user" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json()
+    message = data.get("message", "").strip() if data else ""
+    if not message:
+        return jsonify({"error": "Empty message"}), 400
+
+    if item_id not in chats:
+        chats[item_id] = []
+
+    from datetime import datetime
+    chats[item_id].append({
+        "sender": session["user"],
+        "message": message,
+        "time": datetime.now().strftime("%I:%M %p"),
+    })
+
+    return jsonify({"success": True})
+
+
+# ─────────────────────────────────────────
+#  Dashboard & Notifications
+# ─────────────────────────────────────────
+
+@app.route("/dashboard")
+def dashboard():
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    username = session["user"]
+    
+    # User's items
+    user_items = [i for i in items if i["seller"] == username]
+    total_items = len(user_items)
+    sold_items = len([i for i in user_items if i["sold"]])
+    active_items = total_items - sold_items
+    
+    # Recent activity log
+    activities = []
+    # Base signup activity
+    activities.append({
+        "type": "info",
+        "message": f"Welcome to CampusCart, {username}! Your student seller account is fully active.",
+        "time": "Just now"
+    })
+    
+    for item in user_items:
+        activities.append({
+            "type": "success" if item["sold"] else "post",
+            "message": f"You marked '{item['name']}' as sold!" if item["sold"] else f"You listed '{item['name']}' for ₹{item['price']}.",
+            "time": "Recent"
+        })
+    
+    # Notifications/Alerts: find chats where last message is not from user
+    chat_notifications = []
+    for item_id, msg_list in chats.items():
+        if msg_list:
+            item = get_item(item_id)
+            if item and (item["seller"] == username or any(m["sender"] == username for m in msg_list)):
+                last_msg = msg_list[-1]
+                if last_msg["sender"] != username:
+                    chat_notifications.append({
+                        "item_id": item_id,
+                        "item_name": item["name"],
+                        "sender": last_msg["sender"],
+                        "message": last_msg["message"],
+                        "time": last_msg["time"]
+                    })
+
+    cart_count = len(carts.get(username, []))
+    
+    return render_template(
+        "index.html",
+        page="dashboard",
+        user=username,
+        total_items=total_items,
+        sold_items=sold_items,
+        active_items=active_items,
+        user_items=user_items,
+        activities=activities[:10],
+        notifications=chat_notifications,
+        cart_count=cart_count
+    )
+
+
+@app.route("/item/<item_id>/chat/messages")
+def get_chat_messages(item_id):
+    if "user" not in session:
+        return {"error": "Unauthorized"}, 401
+    
+    item_chats = chats.get(item_id, [])
+    return {
+        "messages": item_chats,
+        "currentUser": session["user"]
+    }
+
+
+@app.route("/api/unread_notifications")
+def unread_notifications():
+    if "user" not in session:
+        return {"notifications": []}
+    
+    username = session["user"]
+    recent_notifications = []
+    
+    for item_id, msg_list in chats.items():
+        if not msg_list:
+            continue
+        item = get_item(item_id)
+        if not item:
+            continue
+        
+        is_participant = (item["seller"] == username) or any(m["sender"] == username for m in msg_list)
+        if is_participant:
+            last_msg = msg_list[-1]
+            if last_msg["sender"] != username:
+                recent_notifications.append({
+                    "item_id": item_id,
+                    "item_name": item["name"],
+                    "sender": last_msg["sender"],
+                    "message": last_msg["message"],
+                    "time": last_msg["time"]
+                })
+                
+    return {"notifications": recent_notifications}
+
+
+@app.route("/api/latest_item")
+def latest_item():
+    if "user" not in session:
+        return {"id": None}
+    
+    if items:
+        latest = items[0]
+        return {
+            "id": latest["id"],
+            "name": latest["name"],
+            "price": latest["price"],
+            "seller": latest["seller"]
+        }
+    return {"id": None}
+
+
 # ─────────────────────────────────────────
 #  Run App
 # ─────────────────────────────────────────
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True, port=5000)
