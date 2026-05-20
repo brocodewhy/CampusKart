@@ -54,6 +54,35 @@
 </nav>
 {% endif %}
 
+<!-- Mobile Bottom Navigation Bar -->
+{% if page != 'login' and page != 'register' %}
+<div class="mobile-bottom-nav">
+  <a href="{{ url_for('index') }}" class="mobile-nav-link {% if page == 'home' %}active{% endif %}">
+    <span class="mobile-nav-icon">🔍</span>
+    <span class="mobile-nav-label">Browse</span>
+  </a>
+  <a href="{{ url_for('post_item') }}" class="mobile-nav-link {% if page == 'post' %}active{% endif %}">
+    <span class="mobile-nav-icon">➕</span>
+    <span class="mobile-nav-label">Sell</span>
+  </a>
+  <a href="{{ url_for('dashboard') }}" class="mobile-nav-link {% if page == 'dashboard' %}active{% endif %}">
+    <span class="mobile-nav-icon">📊</span>
+    <span class="mobile-nav-label">Dashboard</span>
+  </a>
+  <a href="{{ url_for('cart') }}" class="mobile-nav-link {% if page == 'cart' %}active{% endif %}">
+    <span class="mobile-nav-icon">🛒</span>
+    <span class="mobile-nav-label">Cart</span>
+    {% if cart_count and cart_count > 0 %}
+      <span class="mobile-cart-badge">{{ cart_count }}</span>
+    {% endif %}
+  </a>
+  <a href="{{ url_for('logout') }}" class="mobile-nav-link">
+    <span class="mobile-nav-icon">🚪</span>
+    <span class="mobile-nav-label">Logout</span>
+  </a>
+</div>
+{% endif %}
+
 <!-- Notification Toast Container -->
 <div class="notif-toast-container" id="toastContainer"></div>
 
@@ -691,7 +720,7 @@ function tryBrowserNotification(title, body) {
 // ═══════════════════════════════════════════
 //  NOTIFICATION POLLING (messages + new items)
 // ═══════════════════════════════════════════
-{% if page != 'login' and page != 'register' and page != 'detail' %}
+{% if page != 'login' and page != 'register' %}
 let lastNotifCount = 0;
 let lastKnownItemId = null;
 
@@ -706,8 +735,15 @@ function checkNotifications() {
         // Show toast + browser notif for new ones
         if (data.notifications.length > lastNotifCount && lastNotifCount > 0) {
           const latest = data.notifications[data.notifications.length - 1];
-          showToast('💬 New Message', latest.sender + ' messaged about "' + latest.item_name + '"');
-          tryBrowserNotification('Message from ' + latest.sender, latest.message);
+          
+          // Suppress notifications for the active chat detail page
+          const onDetailPage = typeof ITEM_ID !== 'undefined';
+          const isCurrentItem = onDetailPage && (ITEM_ID === latest.item_id);
+          
+          if (!isCurrentItem) {
+            showToast('💬 New Message', latest.sender + ' messaged about "' + latest.item_name + '"');
+            tryBrowserNotification('Message from ' + latest.sender, latest.message);
+          }
         }
         lastNotifCount = data.notifications.length;
       } else {
@@ -723,11 +759,12 @@ function checkNewItems() {
   fetch('/api/latest_item')
     .then(r => r.json())
     .then(data => {
-      if (data.id && lastKnownItemId && data.id !== lastKnownItemId && data.seller !== '{{ user }}') {
+      const currentItemId = data.id || 'empty';
+      if (lastKnownItemId !== null && currentItemId !== 'empty' && currentItemId !== lastKnownItemId && data.seller !== '{{ user }}') {
         showToast('🆕 New Item', data.name + ' listed for ₹' + data.price);
         tryBrowserNotification('New item on CampusCart!', data.name + ' — ₹' + data.price);
       }
-      if (data.id) lastKnownItemId = data.id;
+      lastKnownItemId = currentItemId;
     })
     .catch(() => {});
 }

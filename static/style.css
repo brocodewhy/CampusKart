@@ -1777,6 +1777,10 @@ input, textarea, select { font-family: inherit; }
 /* ─────────────────────────────────────────
    RESPONSIVE
 ───────────────────────────────────────── */
+.mobile-bottom-nav {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .detail-layout { grid-template-columns: 1fr; }
   .cart-layout { grid-template-columns: 1fr; }
@@ -1788,18 +1792,75 @@ input, textarea, select { font-family: inherit; }
 
 @media (max-width: 640px) {
   .navbar { padding: 0 16px; }
-  .nav-links { gap: 2px; }
-  .nav-link { padding: 6px 10px; font-size: 0.8rem; }
-  .user-chip { display: none; }
-  .main-content { padding: 20px 16px 60px; }
+  .navbar .nav-links > a, 
+  .navbar .nav-user {
+    display: none !important;
+  }
+  .navbar .nav-links { gap: 12px; }
+  .main-content { padding: 20px 16px 90px; }
   .auth-card { padding: 32px 24px; }
   .item-form { padding: 24px; }
   .form-row { grid-template-columns: 1fr; }
-  .items-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+  .items-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
   .hero-text h1 { font-size: 1.3rem; }
   .detail-title { font-size: 1.3rem; }
   .dash-stats { grid-template-columns: 1fr; }
   .dash-items-grid { grid-template-columns: 1fr; }
+
+  /* Mobile bottom navigation */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: var(--surface);
+    border-top: 1px solid var(--border-light);
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.15);
+    backdrop-filter: blur(10px);
+    padding: 0 8px;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }
+  
+  .mobile-nav-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-decoration: none;
+    position: relative;
+    padding: 6px 0;
+    flex: 1;
+    transition: all 0.2s ease;
+  }
+  
+  .mobile-nav-link.active {
+    color: var(--primary);
+  }
+  
+  .mobile-nav-icon {
+    font-size: 1.2rem;
+    margin-bottom: 2px;
+  }
+  
+  .mobile-cart-badge {
+    position: absolute;
+    top: 2px;
+    right: calc(50% - 16px);
+    background: var(--primary);
+    color: #ffffff;
+    font-size: 0.6rem;
+    padding: 1px 5px;
+    border-radius: 99px;
+    font-weight: 800;
+    box-shadow: var(--shadow-sm);
+  }
 }
 
 /* ─────────────────────────────────────────
